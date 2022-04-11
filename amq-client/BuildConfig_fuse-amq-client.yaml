@@ -1,0 +1,25 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: fuse-amq-client
+spec:
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: fuse7-java-openshift:1.7
+        namespace: openshift
+      env:
+        - name: MAVEN_ARGS_APPEND
+          value: '-s configuration/settings.xml'
+  source:
+    type: Git
+    git:
+      uri: https://github.com/lcurry/fuse-client-app
+  output:
+    to:
+      kind: ImageStreamTag
+      name: fuse-amq-client:latest
+  triggers:
+    - type: ConfigChange
