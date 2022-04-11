@@ -104,12 +104,15 @@ Certificate was added to keystore
 
 ```
 
-Using the 'oc' command, switch to the namespace that will contain your broker deployment. Create the secret in Openshift to store the TLS credentials. You'll need to use the password you used when you created the keystore.  
-For example:
+Using the 'oc' command, switch to the namespace that will contain your broker deployment. Create the secrets in Openshift to store the TLS credentials. Use the password you used when you created the keystore.  You'll need to create two secrets holding the same keystore.
+One secret is used on the route that handles AMQP(S) messaging traffic to the broker (acceptor), and the other secret is used on
+the route that will handle HTTPS traffic for the admin console.  
+Use the following commands to create both serets:
 
 ```
 oc project <your namespace>
 oc create secret generic iof-amq-secret --from-file=broker.ks=.\/broker.ks --from-file=client.ts=.\/broker.ks --from-literal=keyStorePassword=changeit --from-literal=trustStorePassword=changeit
+oc create secret generic iof-amq-secret-wsconsj --from-file=broker.ks=.\/broker.ks --from-file=client.ts=.\/broker.ks --from-literal=keyStorePassword=changeit --from-literal=trustStorePassword=changeit
 ```
 **NOTE** When creating a secret, OpenShift requires you to specify both a key store and a trust store. The trust store key is generically named client.ts. For one-way TLS between the broker and a client, a trust store is not actually required. However, to successfully generate the secret, you need to specify some valid store file as a value for client.ts. The preceding step provides a "dummy" value for client.ts by reusing the previously-generated broker key store file. This is sufficient to generate a secret with all of the credentials required for one-way TLS.
 
