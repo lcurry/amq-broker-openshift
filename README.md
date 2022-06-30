@@ -1,5 +1,107 @@
 # AMQ OpenShift Configuration
 
+## Steps to install operator 
+
+
+// Prep as cluster admin (up front before any user-specific project gets created)
+
+// following as cluster-admin 
+
+// Prep LMCO has 'project-admin' (different from 'admin') 
+// so create ClusterRole 'project-admin'
+$ oc create -f templates/project-admin.role.yaml 
+
+// Assign project-admin role to user1 
+$ oc adm policy add-role-to-user project-admin user1 -n user1-project 
+
+// Create namespace to hold service account 
+// this could potentially be created in any namespace (e.g. 'openshift-infra' namespace)
+$ oc new-project amq-broker-operator 
+
+// Create 'gitlab-amq-broker-operator-sa' service account in this namespace 
+$ oc create sa gitlab-amq-broker-operator-sa -n amq-broker-operator
+
+// create ClusterRole 'amq-broker-operator' (this *clusterrole* yaml comes from the operator package for 7.9.4)
+$ oc apply -f templates/cluster_role_amq_broker_operator.yaml 
+
+// Apply ClusterRole to 'gitlab-amq-broker-operator-sa' 
+$ oc adm policy add-cluster-role-to-user admin system:serviceaccount:<namespace>:gitlab-amq-broker-operator-sa -n amq-broker-operator
+
+// IS THIS NECESSARY??? Probably since the serviceaccount will need to create similar role and apply it in the user1-project namespace
+// Apply ClusterRole 'amq-broker-operator' w/ ClusterRoleBinding 'amq-broker-operator' to 'gitlab-amq-broker-operator-sa' 
+$ oc apply -f templates/cluster_role_binding_amq_broker_operator.yaml // apply 'amq-broker-operator' Role to gitlab-amq-broker-operator-sa
+// Equivalent command to above without need for defining clusterrolebinding yaml 
+// $ oc adm policy add-cluster-role-to-user amq-broker-operator system:serviceaccount:<namespace>:gitlab-amq-broker-operator-sa -n amq-broker-operator
+
+// Create role needed by sa for customresourcedefinitions (not 100% sure this is required)
+$ oc create clusterrole amq-broker-operator-customresourcedefinitions-clusterrole --verb=* --resource=customresourcedefinitions.apiextensions.k8s.io --resource-name=activemqartemises.broker.amq.io --resource-name=activemqartemisaddresses.broker.amq.io --resource-name=activemqartemisscaledowns.broker.amq.io --resource-name=activemqartemissecurities.broker.amq.io
+// add role to sa 
+$ oc adm policy add-cluster-role-to-user  amq-broker-operator-customresourcedefinitions-clusterrole system:serviceaccount:amq-broker-operator:gitlab-amq-broker-operator-sa -n amq-broker-operator 
+
+// Check that serviceaccount has the three roles you added 
+$ oc describe clusterrolebinding/admin
+$ oc describe clusterrolebinding/amq-broker-operator
+$ oc describe clusterrolebinding/amq-broker-operator-customresourcedefinitions-clusterrole
+
+// Deploy the main broker CRD needed for amq-broker-operator (Note: CRDs are cluster-wide resources 
+so you only need to perform this step once for entire cluster)
+$ oc create -f templates/broker_activemqartemis_crd.yaml
+$ oc create -f templates/broker_activemqartemisaddress_crd.yaml
+$ oc create -f templates/broker_activemqartemisscaledown_crd.yaml
+$ oc create -f templates/broker_activemqartemissecurity_crd.yaml
+// to see the new crds 
+$ oc get crds | grep amq 
+
+// Get token and login 
+$ oc sa get-token -n amq-broker-operator gitlab-amq-broker-operator-sa
+
+
+
+// Things to do in PIpeline 
+$ oc login --token=eyJhbGciOiJSUzI1NiIsImtpZCI6IndObmJKdEFqQm1tc2w3TDRYNUFMdE1SYzJwWGNNZnJYZXlXWEdlYk9ucncifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJhbXEtYnJva2VyLW9wZXJhdG9yIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImdpdGxhYi1hbXEtYnJva2VyLW9wZXJhdG9yLXNhLXRva2VuLWNrdGtwIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImdpdGxhYi1hbXEtYnJva2VyLW9wZXJhdG9yLXNhIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiY2FhMjljNjgtZmFlOC00NTg3LThlY2MtNzAyOTMzODI1NDMwIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmFtcS1icm9rZXItb3BlcmF0b3I6Z2l0bGFiLWFtcS1icm9rZXItb3BlcmF0b3Itc2EifQ.5VUzl6K7h_E2hROt9D23BgNyrZAUP9EbcaLyREy9fn5ngTDueMvV9dS-0OycKgeNM71jmVUnUn7giV0kN5uBkkT1KPgAk2tGOuhiLTE5aOxXGD0O3v7EsdLY1SgTBr7cC1csp0FIP6ILyXMpgKG3Typ4WbKrIkQKraFCZcjwllDCpygYThIHfcz2-hRSsvOATMnNTLXELbZpZAnlTxu5u3t4JHv_rGPgL1Tvmxq8rko4V_CLvAFWJ7c2yEMa5BHbjQnEInxRBsmvi2rmZCD92pnzIzKgHMzu6hCSJhFp9w_MJMRTkTuNR5CbmkHVaOG7UlkxkeoqropZpodfBcSaKw --server=https://api.cluster-kjmg5.kjmg5.sandbox1612.opentlc.com:6443
+
+$ oc project user1-project 
+
+// Create the amq-broker-operator service account local to project.
+    $ oc create serviceaccount amq-broker-operator -n user1-project 
+// Create the amq-broker-operator role in your project. (can skip if re-use clusterrole.. see below)
+    $ oc create -f templates/role_amq_broker_operator.yaml -n user1-project
+// Create the amq-broker-operator role binding in your project. (can skip if re-use clusterrole.. see below)
+    $ oc create -f templates/role_binding_amq_broker_operator.yaml -n user1-project
+// (TBD why didn't this work?) Equivalent to above 2 commands re-use existing clusterrole (applied as a rolebinding) 
+// without need for defining new role & rolebinding yaml 
+$ oc adm policy add-role-to-user  amq-broker-operator amq-broker-operator -n user1-project  
+
+
+// As 'gitlab-amq-broker-operator-sa' install operator 
+$ oc apply -f templates/operator.yaml 
+// apply proper roles to 'user1'  (applying a clusterrole as a "rolebing" (not clusterrolebiding) so not cluster-wide scope
+$ oc adm policy add-role-to-user  amq-broker-operator-customresourcedefinitions-clusterrole user1 -n user1-project  
+// add the amq role created previously to allow user view,edit, update on the crds (APis) via crs
+$ oc adm policy add-role-to-user  amq-broker-operator user1 -n user1-project  
+
+// Note: Above creates a new clusterrolebinding -0 that you can inspect to confirm clusterrole was added to user1 
+$ oc describe rolebinding/amq-broker-operator-customresourcedefinitions-clusterrole -n user1-project
+
+
+// opentlc-mgr 
+oc login --token=sha256~7O1IwoPPUo3IpICsfKXdYmq59T1oJ4R-W4Z5IkIK3mM --server=https://api.cluster-kjmg5.kjmg5.sandbox1612.opentlc.com:6443
+// user1 
+oc login --token=sha256~fQJhg_caLzLIOpFn0K9klqMYXlCEc_7_ScMoE2OnTGY --server=https://api.cluster-kjmg5.kjmg5.sandbox1612.opentlc.com:6443
+// serviceaccount gitlab-amq-broker-operator
+oc login --token=eyJhbGciOiJSUzI1NiIsImtpZCI6IndObmJKdEFqQm1tc2w3TDRYNUFMdE1SYzJwWGNNZnJYZXlXWEdlYk9ucncifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJhbXEtYnJva2VyLW9wZXJhdG9yIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImdpdGxhYi1hbXEtYnJva2VyLW9wZXJhdG9yLXNhLXRva2VuLWNrdGtwIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImdpdGxhYi1hbXEtYnJva2VyLW9wZXJhdG9yLXNhIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiY2FhMjljNjgtZmFlOC00NTg3LThlY2MtNzAyOTMzODI1NDMwIiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmFtcS1icm9rZXItb3BlcmF0b3I6Z2l0bGFiLWFtcS1icm9rZXItb3BlcmF0b3Itc2EifQ.5VUzl6K7h_E2hROt9D23BgNyrZAUP9EbcaLyREy9fn5ngTDueMvV9dS-0OycKgeNM71jmVUnUn7giV0kN5uBkkT1KPgAk2tGOuhiLTE5aOxXGD0O3v7EsdLY1SgTBr7cC1csp0FIP6ILyXMpgKG3Typ4WbKrIkQKraFCZcjwllDCpygYThIHfcz2-hRSsvOATMnNTLXELbZpZAnlTxu5u3t4JHv_rGPgL1Tvmxq8rko4V_CLvAFWJ7c2yEMa5BHbjQnEInxRBsmvi2rmZCD92pnzIzKgHMzu6hCSJhFp9w_MJMRTkTuNR5CbmkHVaOG7UlkxkeoqropZpodfBcSaKw --server=https://api.cluster-kjmg5.kjmg5.sandbox1612.opentlc.com:6443
+
+
+// Apply the required roles to user1 (where does the role come from)
+// oc adm policy add-role-to-user activemqartemisaddresses.broker.amq.io-v2alpha2-admin  user1 -n user1-project 
+// oc adm policy add-role-to-user activemqartemises.broker.amq.io-v2alpha4-admin $USER -n i$NAMESPACE
+// oc adm policy add-role-to-user activemqartemisscaledowns.broker.amq.io-v2alpha1-admin $USER -n $NAMESPACE
+
+
+// Apply CR for broker (tested and works for service account) 
+$ oc apply -f templates/broker_activemqartemis_cr.yaml
+
+
 ## Demonstrated Capabilities
 
 This repository includes demonstrations of various AMQP messaging scenarios and capabilities implemented with open source technologies.
