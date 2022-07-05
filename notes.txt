@@ -1,0 +1,95 @@
+
+// Use your gitlab access token to clone this repo locally 
+// If don't have an access token for gitlab, see gitlab docs on creating access token:
+// https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html  
+git clone https://<token>@gitlab.global.lmco.com/force/paas/middleware/amq-broker-openshift.git
+
+// change directories into the root folder of the newly cloned repository 
+cd amq-broker-openshift 
+
+## Setup Openshift environment (one time setup service account and roles)
+// The following steps only need to be performed once per environment
+// login to openshift cluster as a user with cluster-admin role  
+oc login ...
+
+// Create 'gitlab-amq-broker-operator-sa' service account in the 'openshift-operators' namespace 
+$ oc create sa gitlab-amq-broker-operator-sa -n openshift-operators
+
+// create ClusterRole 'amq-broker-operator' (not sure needed)
+$ oc apply -f amq-operator/cluster_role_amq_broker_operator.yaml 
+
+// Apply  the ClusterRole 'amq-broker-operator' to service account 'gitlab-amq-broker-operator-sa' (not sure needed)
+$ oc apply -f amq-operator/cluster_role_binding_amq_broker_operator.yaml
+
+// Apply 'admin' ClusterRole to 'gitlab-amq-broker-operator-sa' 
+$ oc adm policy add-cluster-role-to-user admin system:serviceaccount:openshift-operators:gitlab-amq-broker-operator-sa -n openshift-operators
+
+// Create role needed by sa for customresourcedefinitions  (not sure needed)
+$ oc create clusterrole amq-broker-operator-customresourcedefinitions-clusterrole --verb=* --resource=customresourcedefinitions.apiextensions.k8s.io --resource-name=activemqartemises.broker.amq.io --resource-name=activemqartemisaddresses.broker.amq.io --resource-name=activemqartemisscaledowns.broker.amq.io --resource-name=activemqartemissecurities.broker.amq.io
+
+// add role to sa 
+$ oc adm policy add-cluster-role-to-user  amq-broker-operator-customresourcedefinitions-clusterrole system:serviceaccount:openshift-operators:gitlab-amq-broker-operator-sa
+
+// to confirm cluster roles have been added to service account gitlab-amq-broker-operator-sa
+$ oc describe clusterrolebinding/amq-broker-operator 
+$ oc describe clusterrolebinding/amq-broker-operator-customresourcedefinitions-clusterrole
+
+
+// Deploy the main broker CRD needed for amq-broker-operator (Note: CRDs are cluster-wide resources 
+// so you only need to perform this step once for entire cluster)
+// these crds may or may not already exist. If exist, and different version will 
+// need to delete existing before 
+$ oc apply -f amq-operator/broker_activemqartemis_crd.yaml
+$ oc apply -f amq-operator/broker_activemqartemisaddress_crd.yaml
+$ oc apply -f amq-operator/broker_activemqartemisscaledown_crd.yaml
+$ oc apply -f amq-operator/broker_activemqartemissecurity_crd.yaml
+
+// to see the new crds 
+$ oc get crds | grep amq 
+
+// Get token for new service account 'gitlab-amq-broker-operator-sa' 
+//
+$ oc sa get-token -n openshift-operators gitlab-amq-broker-operator-sa
+
+// the token returned from above command can be used to login to Openshift using 'oc login' command 
+// from the automation code in Gitlab Pipeline 
+
+## Run from Gitlab pipeline as service account ' gitlab-amq-broker-operator-sa'
+// login to environment with service account token  
+ oc login --token=<service account token> --server=https://api.ocp-uge1-dev.ecs.us.lmco.com:6443
+
+// switch to project where Operator should be installed. E.g. referred below as <project name>
+$ oc project <project name> 
+
+// Create the amq-broker-operator service account local to project.
+$ oc create serviceaccount amq-broker-operator -n <project name> 
+
+// Create the amq-broker-operator role in your project. (can skip if re-use clusterrole.. see below)
+$ oc create -f amq-operator/role_amq_broker_operator.yaml -n <project name>
+
+// Create the amq-broker-operator role binding in your project. (can skip if re-use clusterrole.. see below)
+$ oc create -f amq-operator/role_binding_amq_broker_operator.yaml -n <project name>
+
+// (TBD why didn't this work?) Equivalent to above 2 commands re-use existing clusterrole (applied as a rolebinding) 
+// Add cluster role to local service account 
+// without need for defining new local role & rolebinding  
+$ oc adm policy add-cluster-role-to-user  amq-broker-operatorsystem:serviceaccount:<project name>:amq-broker-operator 
+
+
+// add the 'admin' role to the new local amq-broker-operator' service account (not sure needed)
+$ oc adm policy add-role-to-user admin system:serviceaccount:<project name>:amq-broker-operator 
+
+// apply "simple" instance CR of broker 
+$ oc apply -f amq-broker/broker_activemqartemis_cr.yaml
+
+
+## Sample: Can now be run as user <example user> after provisioning of operator by Gitlab service account 
+// Example showing how user who created SErviceCentral request is now able to login with own user name and 
+// install broker instance 
+$ oc login --token=... 
+
+// switch to project where AMQ Broker operator was installed  
+$ oc project <project name> 
+
+// Apply CR for a "custom" broker 
+$ oc apply -f amq-broker/custom_broker_activemqartemis_cr.yaml
