@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: amq-broker-operator-customresourcedefinitions-clusterrole
+rules:
+- apiGroups:
+  - apiextensions.k8s.io
+  resourceNames:
+  - activemqartemises.broker.amq.io
+  - activemqartemisaddresses.broker.amq.io
+  - activemqartemisscaledowns.broker.amq.io
+  - activemqartemissecurities.broker.amq.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - '*'
