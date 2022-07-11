@@ -1,0 +1,260 @@
+apiVersion: broker.amq.io/v1alpha1
+kind: ActiveMQArtemisSecurity
+metadata:
+  name: broker
+  namespace: amq-avianca
+spec:
+  applyToCrNames:
+  - broker
+  loginModules:
+    propertiesLoginModules:
+    - name: prop-module
+      users:
+      - name: flyUpCrew
+        password: temporal
+        roles:
+        - flyUpCrew-interactive
+      - name: lsy
+        password: temporal
+        roles:
+        - lsy-interactive
+      - name: flyUpOps
+        password: temporal
+        roles:
+        - flyUpOps-interactive
+      - name: heco
+        password: temporal
+        roles:
+        - heco-interactive
+  securityDomains:
+    brokerDomain:
+      loginModules:
+      - flag: sufficient
+        name: prop-module
+      name: activemq
+  securitySettings:
+    broker:
+    - match: '#'
+      permissions:
+      - operationType: send
+        roles:
+        - admin
+      - operationType: consume
+        roles:
+        - admin
+      - operationType: browse
+        roles:
+        - admin
+      - operationType: createDurableQueue
+        roles:
+        - admin
+      - operationType: deleteDurableQueue
+        roles:
+        - admin
+      - operationType: createNonDurableQueue
+        roles:
+        - admin
+      - operationType: deleteNonDurableQueue
+        roles:
+        - admin
+      - operationType: createAddress
+        roles:
+        - admin
+      - operationType: deleteAddress
+        roles:
+        - admin
+      - operationType: manage
+        roles:
+        - admin
+    - match: AVA2LSY.CFMU
+      permissions:
+      - operationType: send
+        roles:
+        - admin
+        - lsy-interactive
+      - operationType: consume
+        roles:
+        - admin
+        - lsy-interactive
+      - operationType: browse
+        roles:
+        - admin
+        - lsy-interactive
+      - operationType: createDurableQueue
+        roles:
+        - admin
+      - operationType: deleteDurableQueue
+        roles:
+        - admin
+      - operationType: createNonDurableQueue
+        roles:
+        - admin
+      - operationType: deleteNonDurableQueue
+        roles:
+        - admin
+      - operationType: createAddress
+        roles:
+        - admin
+      - operationType: deleteAddress
+        roles:
+        - admin
+      - operationType: manage
+        roles:
+        - admin
+    - match: AVA2FLYUP.READMSGTRIPDH
+      permissions:
+      - operationType: send
+        roles:
+        - admin
+        - flyUpCrew-interactive
+      - operationType: consume
+        roles:
+        - admin
+        - flyUpCrew-interactive
+      - operationType: browse
+        roles:
+        - admin
+        - flyUpCrew-interactive
+      - operationType: createDurableQueue
+        roles:
+        - admin
+      - operationType: deleteDurableQueue
+        roles:
+        - admin
+      - operationType: createNonDurableQueue
+        roles:
+        - admin
+      - operationType: deleteNonDurableQueue
+        roles:
+        - admin
+      - operationType: createAddress
+        roles:
+        - admin
+      - operationType: deleteAddress
+        roles:
+        - admin
+      - operationType: manage
+        roles:
+        - admin
+    - match: FLYUP2AVA.FOLTABLE
+      permissions:
+      - operationType: send
+        roles:
+        - admin
+        - flyUpOps-interactive
+      - operationType: consume
+        roles:
+        - admin
+        - flyUpOps-interactive
+      - operationType: browse
+        roles:
+        - admin
+        - flyUpOps-interactive
+      - operationType: createDurableQueue
+        roles:
+        - admin
+      - operationType: deleteDurableQueue
+        roles:
+        - admin
+      - operationType: createNonDurableQueue
+        roles:
+        - admin
+      - operationType: deleteNonDurableQueue
+        roles:
+        - admin
+      - operationType: createAddress
+        roles:
+        - admin
+      - operationType: deleteAddress
+        roles:
+        - admin
+      - operationType: manage
+        roles:
+        - admin
+    - match: HECO2AVA.ARRDEPSTATE
+      permissions:
+      - operationType: send
+        roles:
+        - admin
+        - heco-interactive
+      - operationType: consume
+        roles:
+        - admin
+        - heco-interactive
+      - operationType: browse
+        roles:
+        - admin
+        - heco-interactive
+      - operationType: createDurableQueue
+        roles:
+        - admin
+      - operationType: deleteDurableQueue
+        roles:
+        - admin
+      - operationType: createNonDurableQueue
+        roles:
+        - admin
+      - operationType: deleteNonDurableQueue
+        roles:
+        - admin
+      - operationType: createAddress
+        roles:
+        - admin
+      - operationType: deleteAddress
+        roles:
+        - admin
+      - operationType: manage
+        roles:
+        - admin
+    management:
+      authorisation:
+        roleAccess:
+        - accessList:
+          - method: '*'
+            roles:
+            - admin
+          - method: 'set*'
+            roles:
+            - admin
+          - method: 'list*'
+            roles:
+            - admin
+            - flyUpCrew-interactive
+            - lsy-interactive
+            - flyUpOps-interactive
+            - heco-interactive
+          - method: 'get*'
+            roles:
+            - admin
+            - flyUpCrew-interactive
+            - lsy-interactive
+            - flyUpOps-interactive
+            - heco-interactive
+          - method: 'is*'
+            roles:
+            - admin
+            - flyUpCrew-interactive
+            - lsy-interactive
+            - flyUpOps-interactive
+            - heco-interactive
+          - method: 'browse*'
+            roles:
+            - admin
+            - flyUpCrew-interactive
+            - lsy-interactive
+            - flyUpOps-interactive
+            - heco-interactive
+          - method: 'count*'
+            roles:
+            - admin
+            - flyUpCrew-interactive
+            - lsy-interactive
+            - flyUpOps-interactive
+            - heco-interactive
+          domain: org.apache.activemq.artemis
+      hawtioRoles:
+      - admin
+      - flyUpCrew-interactive
+      - lsy-interactive
+      - flyUpOps-interactive
+      - heco-interactive

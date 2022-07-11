@@ -1,0 +1,50 @@
+stages:
+  - create-sa
+  - create-role
+  - create-operator-role
+  - create-operator-role-binding
+  - apply-roles
+  - apply-operator
+  - apply-broker
+
+variables:
+  PROJECT_NAME:
+    value: ""  
+    description: "Project that the broker is being deployed to"
+
+before_script:
+  - oc login --token=$OSH_TOKEN --server=$DEV_SERVER_URL
+  - oc project $PROJECT_NAME
+create-sa:
+  image: widerin/openshift-cli
+  stage: create-sa
+  script: 
+  - oc create serviceaccount amq-broker-operator -n $PROJECT_NAME 
+  when: manual
+
+create-operator-role:
+  stage: create-operator-role
+  script: oc create -f ./amq-operator/role_amq_broker_operator.yaml -n $PROJECT_NAME
+  when: manual
+
+create-operator-role-binding:
+  stage: create-operator-role-binding
+  script: oc create -f amq-operator/role_binding_amq_broker_operator.yaml -n $PROJECT_NAME
+  when: manual
+
+apply-roles:
+  stage: apply-roles
+  script: 
+  - oc adm policy add-role-to-user  amq-broker-operator-customresourcedefinitions-clusterrole user1 -n $PROJECT_NAME  
+  - oc adm policy add-role-to-user  amq-broker-operator user1 -n $PROJECT_NAME  
+  when: manual
+
+apply-operator:
+  stage: apply-operator
+  script: oc apply -f amq-operator/operator.yaml 
+  when: manual
+
+apply-broker:
+  stage: apply-broker
+  script: oc apply -f amq-broker/broker_activemqartemis_cr.yaml
+  when: manual
